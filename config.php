@@ -1,6 +1,10 @@
 <?php
-// GitHub API settings
-$github_username = 'your_org_or_user';
-$github_repo = 'your_repo_name';
-$github_token = 'your_personal_access_token';
+require_once __DIR__ . '/vendor/autoload.php';
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+
+$github_token = $_ENV['GITHUB_TOKEN'];
+$repo_owner   = $_ENV['REPO_OWNER'];
+
 ?>
