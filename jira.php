@@ -255,91 +255,21 @@
             <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
             </ol>
         </div>
+<?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-        <div class="row mb-3">
-            <div class="col-lg-12">
-            <div class="card p-3">
-                <div class="d-flex flex-wrap align-items-center mb-3">
+$config = require 'config.php';
 
-                <!-- Repo Dropdown -->
-                <div class="form-group mb-2 mr-3">
-                    <label for="repo" class="mr-2">Repo:</label>
-                    <select class="form-control" id="repo">
-                    <option value="mediquick" selected>SMBC Dashboard</option>
-                    <option value="repo2">Repo 2</option>
-                    </select>
-                </div>
+$jiraDomain = $config['jiraDomain'];
+$email = $config['email'];
+$apiToken = $config['apiToken'];
 
-                <!-- Developer Dropdown -->
-                <div class="form-group mb-2 mr-3">
-                    <label for="developer" class="mr-2">Developer:</label>
-                    <select class="form-control" id="developer" onchange="handleDeveloperChange()">
-                    <option value="">Select Developer</option>
-                    <option value="arjun2588">Arjun</option>
-                    <option value="dev2">Dev 2</option>
-                    </select>
-                </div>
-
-                <!-- Team Dropdown -->
-                <div class="form-group mb-2 mr-3">
-                    <label for="team" class="mr-2">Team:</label>
-                    <select class="form-control" id="team" onchange="handleTeamChange()">
-                    <option value="">Select Team</option>
-                    <option value="Developers-Team">Developers Team</option>
-                    <option value="team2">Team 2</option>
-                    </select>
-                </div>
-
-                <!-- Tab Buttons -->
-                <div class="btn-group mb-2 mr-3">
-                    <div class="btn-group">
-                        <button type="button" class="btn btn-primary" onclick="filterByTab('daily')">Daily</button>
-                        <button type="button" class="btn btn-secondary" onclick="filterByTab('weekly')">Weekly</button>
-                    </div>
-                </div>
-
-                <!-- Sprint Dropdown -->
-                <div class="form-group mb-2">
-                    <label for="sprint" class="mr-2">Sprint:</label>
-                    <select class="form-control" id="sprint" onchange="filterByTab('sprint')">
-                    <option value="">Select Sprint</option>
-                    <option value="2025-05-01@@@2025-05-21">Sprint 1</option>
-                    <option value="2025-05-22@@@2025-06-14">Sprint 2</option>
-                    </select>
-                </div>
-
-                </div>
-
-                <!-- Chart Area -->
-                <!-- <div>
-                <canvas id="prChart" width="100%" height="40"></canvas>
-                </div> -->
-            </div>
-            </div>
-        </div>
-            <!-- Chart Card -->
-            <div class="row">
-                <div class="col-lg-12">
-                <div class="card p-4">
-                    <h5 class="card-title">Chart</h5>
-                    <div>
-                    <?php
-    error_reporting(E_ALL);
-    ini_set('display_errors', 1);
-
-
-    $config = require 'config.php';
-
-    // === INPUT PARAMETERS ===
-    $jiraDomain = $config['jiraDomain'];
-    $email = $config['email'];
-    $apiToken = $config['apiToken'];
-
-    $auth = base64_encode("$email:$apiToken");
-    $headers = [
-        "Authorization: Basic $auth",
-        "Accept: application/json"
-    ];
+$auth = base64_encode("$email:$apiToken");
+$headers = [
+    "Authorization: Basic $auth",
+    "Accept: application/json"
+];
 
 function getBoards($jiraDomain, $headers) {
     $url = "$jiraDomain/rest/agile/1.0/board?maxResults=1000";
@@ -363,17 +293,27 @@ function getSprints($jiraDomain, $boardId, $headers) {
     return $data['values'] ?? [];
 }
 
-function fetchIssues($jiraDomain, $sprintId, $developer, $headers, $storyPointField, $timeRange) {
+function fetchIssues($jiraDomain, $boardId, $sprintId, $developer, $headers, $storyPointField, $timeRange) {
     $jql = "statusCategory = Done";
 
     if ($timeRange === 'sprint' && $sprintId) {
         $jql .= " AND sprint = $sprintId";
-    } elseif ($timeRange === 'daily') {
-        $today = date('Y-m-d');
-        $jql .= " AND resolved >= $today";
-    } elseif ($timeRange === 'weekly') {
-        $sevenDaysAgo = date('Y-m-d', strtotime('-7 days'));
-        $jql .= " AND resolved >= $sevenDaysAgo";
+    } else {
+        // Restrict issues to selected board's sprints
+        $allSprints = getSprints($jiraDomain, $boardId, $headers);
+        $sprintIds = array_map(fn($s) => $s['id'], $allSprints);
+        if (!empty($sprintIds)) {
+            $sprintIdsStr = implode(',', $sprintIds);
+            $jql .= " AND sprint IN ($sprintIdsStr)";
+        }
+
+        if ($timeRange === 'daily') {
+            $today = date('Y-m-d');
+            $jql .= " AND resolved >= $today";
+        } elseif ($timeRange === 'weekly') {
+            $sevenDaysAgo = date('Y-m-d', strtotime('-7 days'));
+            $jql .= " AND resolved >= $sevenDaysAgo";
+        }
     }
 
     if (!empty($developer)) {
@@ -408,9 +348,16 @@ function calculateStoryPoints($issues, $storyPointField, &$developers) {
     return [$total, $labels, $points];
 }
 
-// Load filters
 $boards = getBoards($jiraDomain, $headers);
-$boardId = $_GET['boardId'] ?? ($boards[0]['id'] ?? 1);
+$defaultBoardId = null;
+foreach ($boards as $board) {
+    if (stripos($board['name'], 'TP') !== false) {
+        $defaultBoardId = $board['id'];
+        break;
+    }
+}
+$boardId = $_GET['boardId'] ?? $defaultBoardId ?? ($boards[0]['id'] ?? 1);
+
 $sprintId = $_GET['sprintId'] ?? '';
 $developer = $_GET['developer'] ?? '';
 $timeRange = $_GET['timeRange'] ?? 'sprint';
@@ -428,65 +375,72 @@ if ($sprintId) {
     }
 }
 
-// Step 1: Fetch issues for all developers to populate the dropdown
-$allIssues = fetchIssues($jiraDomain, $sprintId, '', $headers, $storyPointField, $timeRange);
+// Step 1: Get all issues from the selected board (for listing developers)
+$allIssues = fetchIssues($jiraDomain, $boardId, $sprintId, '', $headers, $storyPointField, $timeRange);
 $developers = [];
-calculateStoryPoints($allIssues, $storyPointField, $developers); // Just populate developers list
+calculateStoryPoints($allIssues, $storyPointField, $developers);
 
-// Step 2: Fetch issues for selected developer (if any)
-$issues = $developer ? fetchIssues($jiraDomain, $sprintId, $developer, $headers, $storyPointField, $timeRange) : $allIssues;
+// Step 2: Filter issues by developer
+$issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer, $headers, $storyPointField, $timeRange) : $allIssues;
 [$totalPoints, $issueLabels, $issuePoints] = calculateStoryPoints($issues, $storyPointField, $developers);
-
-
-//print_r($issuePoints);
-
-
 ?>
 
 <form method="get" style="margin-bottom: 20px;">
-    <label>Board:
-        <select name="boardId" required>
-            <?php foreach ($boards as $board): ?>
-                <option value="<?= $board['id'] ?>" <?= $board['id'] == $boardId ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($board['name']) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-    </label>
+    <div class="row mb-3">
+        <div class="col-lg-12">
+            <div class="card p-3">
+                <div class="d-flex flex-wrap align-items-center mb-3">
 
-    <label>Time Range:
-        <select name="timeRange" onchange="toggleSprint(this.value)">
-            <option value="sprint" <?= $timeRange == 'sprint' ? 'selected' : '' ?>>Sprint</option>
-            <option value="daily" <?= $timeRange == 'daily' ? 'selected' : '' ?>>Daily</option>
-            <option value="weekly" <?= $timeRange == 'weekly' ? 'selected' : '' ?>>Weekly</option>
-        </select>
-    </label>
+                    <div class="form-group mb-2 mr-3">
+                        <label for="repo" class="mr-2">Board:</label>
+                        <select class="form-control" name="boardId" onchange="this.form.submit()">
+                            <?php foreach ($boards as $board): ?>
+                                <option value="<?= $board['id'] ?>" <?= $board['id'] == $boardId ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($board['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
 
-    <label id="sprintSelect">Sprint:
-        <select name="sprintId">
-            <option value="">-- Select Sprint --</option>
-            <?php foreach ($sprints as $s): ?>
-                <option value="<?= $s['id'] ?>" <?= $s['id'] == $sprintId ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($s['name']) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-    </label>
+                    <div class="form-group mb-2 mr-3">
+                        <label for="timeRange" class="mr-2">Time Range:</label>
+                        <select class="form-control" name="timeRange" onchange="this.form.submit()">
+                            <option value="sprint" <?= $timeRange == 'sprint' ? 'selected' : '' ?>>Sprint</option>
+                            <option value="daily" <?= $timeRange == 'daily' ? 'selected' : '' ?>>Daily</option>
+                            <option value="weekly" <?= $timeRange == 'weekly' ? 'selected' : '' ?>>Weekly</option>
+                        </select>
+                    </div>
 
-    <label>Developer:
-        <select name="developer">
-            <option value="">-- All Developers --</option>
-            <?php foreach ($developers as $id => $name): ?>
-                <option value="<?= $id ?>" <?= $id == $developer ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($name) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-    </label>
+                    <div class="form-group mb-2 mr-3" id="sprintSelect">
+                        <label for="sprintId" class="mr-2">Sprint:</label>
+                        <select class="form-control" name="sprintId" onchange="this.form.submit()">
+                            <option value="">-- Select Sprint --</option>
+                            <?php foreach ($sprints as $s): ?>
+                                <option value="<?= $s['id'] ?>" <?= $s['id'] == $sprintId ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($s['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
 
-    <input type="hidden" name="storyPointField" value="<?= htmlspecialchars($storyPointField) ?>">
+                    <div class="form-group mb-2 mr-3">
+                        <label for="developer">Developer:</label>
+                        <select class="form-control" name="developer" onchange="this.form.submit()">
+                            <option value="">-- All Developers --</option>
+                            <?php foreach ($developers as $id => $name): ?>
+                                <option value="<?= $id ?>" <?= $id == $developer ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($name) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
 
-    <button type="submit">Update</button>
+                    <input type="hidden" name="storyPointField" value="<?= htmlspecialchars($storyPointField) ?>">
+
+                </div>
+            </div>
+        </div>
+    </div>
 </form>
 
 <p><strong>Total Completed Story Points: <?= $totalPoints ?></strong></p>
@@ -494,20 +448,13 @@ $issues = $developer ? fetchIssues($jiraDomain, $sprintId, $developer, $headers,
 <canvas id="storyChart" width="800" height="400"></canvas>
 
 <script>
-    function toggleSprint(val) {
-        document.getElementById('sprintSelect').style.display = (val === 'sprint') ? 'inline-block' : 'none';
-    }
-
-    toggleSprint('<?= $timeRange ?>');
-
-    const ctx = document.getElementById('storyChart').getContext('2d');
-
     const issueLabels = <?= json_encode(array_map(function($label) {
         return mb_strlen($label) > 30 ? mb_substr($label, 0, 27) . '...' : $label;
     }, $issueLabels)) ?>;
 
     const chartTitle = '<?= $developer ? "Tasks for " . addslashes($developers[$developer] ?? "Developer") : "All Developers" ?> - <?= ucfirst($timeRange) ?>';
 
+    const ctx = document.getElementById('storyChart').getContext('2d');
     new Chart(ctx, {
         type: 'bar',
         data: {
@@ -546,10 +493,15 @@ $issues = $developer ? fetchIssues($jiraDomain, $sprintId, $developer, $headers,
         }
     });
 </script>
-                    </div>
-                </div>
-                </div>
+
+
+
+</div>
+
             </div>
+            </div>
+        </div>
+
         </div>
         <!-- End Container Fluid -->
 
