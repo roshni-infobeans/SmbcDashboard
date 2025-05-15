@@ -1,11 +1,12 @@
 <?php
 header('Content-Type: application/json');
 require_once 'config.php';
+require_once 'helopers.php';
 
 // === INPUT PARAMETERS ===
 $repo_name = $_GET['repo'] ?? '';
 $developer = $_GET['developer'] ?? '';
-$team = $_GET['team'] ?? '';
+$team_slug = $_GET['team'] ?? '';
 $tab = $_GET['tab'] ?? 'daily';
 $startDate = $_GET['startDate'] ?? '';
 $endDate = $_GET['endDate'] ?? '';
@@ -13,6 +14,7 @@ $all_prs = [];
 $page = 1;
 $per_page = 100;
 
+$teamDevelopers = get_developers_by_team($github_token,$github_organization,$team_slug);
 do{
     $api_url = "https://api.github.com/repos/$repo_owner/$repo_name/pulls?state=closed&per_page=$per_page&page=$page";
 
@@ -76,7 +78,7 @@ foreach ($all_prs as $pr) {
     }
 
     // Filter by team if selected
-    if (!empty($team) && !in_array(strtolower($pr['user']['login']),['arjun2588'])) {
+    if (!empty($team_slug) && !in_array(strtolower($pr['user']['login']),$teamDevelopers)) {
         continue;
     }
 
