@@ -12,10 +12,11 @@
   <link href="assets/vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
   <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css">
   <link href="assets/css/ruang-admin.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body id="page-top">
-  <div id="wrapper">
+ <div id="wrapper">
     <!-- Sidebar -->
     <ul class="navbar-nav sidebar sidebar-light accordion" id="accordionSidebar">
       <a class="sidebar-brand d-flex align-items-center justify-content-center" href="#">
@@ -45,19 +46,13 @@
             <a class="collapse-item" href="pr_merge_time.php">Time to merge PR</a>
           </div>
         </div>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseBootstrap"
-          aria-expanded="true" aria-controls="collapseBootstrap">
-          <i class="far fa-fw fa-window-maximize"></i>
-          <span>Productivity</span>
-        </a>
         <div id="collapseBootstrap" class="collapse" aria-labelledby="headingBootstrap" data-parent="#accordionSidebar">
           <div class="bg-white py-2 collapse-inner rounded">
-            <a class="collapse-item" href="jira.php">Completed Story Per Points</a>
+           <a class="collapse-item" href="jira.php">Completed Story Points</a>
           </div>
         </div>
       </li>
+     
       <hr class="sidebar-divider">
       <div class="version" id="version-ruangadmin"></div>
     </ul>
@@ -254,7 +249,7 @@
         <!-- Container Fluid-->
         <div class="container-fluid" id="container-wrapper">
         <div class="d-sm-flex align-items-center justify-content-between mb-4">
-            <h1 class="h3 mb-0 text-gray-800">Time to Merge Pull Requests</h1>
+            <h1 class="h3 mb-0 text-gray-800">Story Points Dashboard</h1>
             <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="./">Home</a></li>
             <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
@@ -328,7 +323,229 @@
                 <div class="card p-4">
                     <h5 class="card-title">Chart</h5>
                     <div>
-                    <canvas id="prChart" width="100%" height="40"></canvas>
+                    <?php
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
+
+
+    $config = require 'config.php';
+
+    // === INPUT PARAMETERS ===
+    $jiraDomain = $config['jiraDomain'];
+    $email = $config['email'];
+    $apiToken = $config['apiToken'];
+
+    $auth = base64_encode("$email:$apiToken");
+    $headers = [
+        "Authorization: Basic $auth",
+        "Accept: application/json"
+    ];
+
+function getBoards($jiraDomain, $headers) {
+    $url = "$jiraDomain/rest/agile/1.0/board?maxResults=1000";
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $result = curl_exec($ch);
+    curl_close($ch);
+    $data = json_decode($result, true);
+    return $data['values'] ?? [];
+}
+
+function getSprints($jiraDomain, $boardId, $headers) {
+    $url = "$jiraDomain/rest/agile/1.0/board/$boardId/sprint?state=active,future,closed";
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $result = curl_exec($ch);
+    curl_close($ch);
+    $data = json_decode($result, true);
+    return $data['values'] ?? [];
+}
+
+function fetchIssues($jiraDomain, $sprintId, $developer, $headers, $storyPointField, $timeRange) {
+    $jql = "statusCategory = Done";
+
+    if ($timeRange === 'sprint' && $sprintId) {
+        $jql .= " AND sprint = $sprintId";
+    } elseif ($timeRange === 'daily') {
+        $today = date('Y-m-d');
+        $jql .= " AND resolved >= $today";
+    } elseif ($timeRange === 'weekly') {
+        $sevenDaysAgo = date('Y-m-d', strtotime('-7 days'));
+        $jql .= " AND resolved >= $sevenDaysAgo";
+    }
+
+    if (!empty($developer)) {
+        $jql .= " AND assignee = \"$developer\"";
+    }
+
+    $url = "$jiraDomain/rest/api/3/search?jql=" . urlencode($jql) . "&fields=summary,status,assignee,$storyPointField,resolutiondate&maxResults=100";
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $result = curl_exec($ch);
+    curl_close($ch);
+    return json_decode($result, true);
+}
+
+function calculateStoryPoints($issues, $storyPointField, &$developers) {
+    $total = 0;
+    $labels = [];
+    $points = [];
+    foreach ($issues['issues'] as $issue) {
+        $summary = $issue['fields']['summary'] ?? 'Unknown';
+        $value = $issue['fields'][$storyPointField] ?? 0;
+        $assignee = $issue['fields']['assignee']['displayName'] ?? '';
+        $accountId = $issue['fields']['assignee']['accountId'] ?? '';
+        if ($accountId) {
+            $developers[$accountId] = $assignee;
+        }
+        $total += $value;
+        $labels[] = $summary;
+        $points[] = $value;
+    }
+    return [$total, $labels, $points];
+}
+
+// Load filters
+$boards = getBoards($jiraDomain, $headers);
+$boardId = $_GET['boardId'] ?? ($boards[0]['id'] ?? 1);
+$sprintId = $_GET['sprintId'] ?? '';
+$developer = $_GET['developer'] ?? '';
+$timeRange = $_GET['timeRange'] ?? 'sprint';
+$storyPointField = $_GET['storyPointField'] ?? 'customfield_10016';
+
+$sprints = getSprints($jiraDomain, $boardId, $headers);
+
+$sprintName = 'N/A';
+if ($sprintId) {
+    foreach ($sprints as $sprint) {
+        if ($sprint['id'] == $sprintId) {
+            $sprintName = $sprint['name'];
+            break;
+        }
+    }
+}
+
+// Step 1: Fetch issues for all developers to populate the dropdown
+$allIssues = fetchIssues($jiraDomain, $sprintId, '', $headers, $storyPointField, $timeRange);
+$developers = [];
+calculateStoryPoints($allIssues, $storyPointField, $developers); // Just populate developers list
+
+// Step 2: Fetch issues for selected developer (if any)
+$issues = $developer ? fetchIssues($jiraDomain, $sprintId, $developer, $headers, $storyPointField, $timeRange) : $allIssues;
+[$totalPoints, $issueLabels, $issuePoints] = calculateStoryPoints($issues, $storyPointField, $developers);
+
+
+//print_r($issuePoints);
+
+
+?>
+
+<form method="get" style="margin-bottom: 20px;">
+    <label>Board:
+        <select name="boardId" required>
+            <?php foreach ($boards as $board): ?>
+                <option value="<?= $board['id'] ?>" <?= $board['id'] == $boardId ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($board['name']) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+
+    <label>Time Range:
+        <select name="timeRange" onchange="toggleSprint(this.value)">
+            <option value="sprint" <?= $timeRange == 'sprint' ? 'selected' : '' ?>>Sprint</option>
+            <option value="daily" <?= $timeRange == 'daily' ? 'selected' : '' ?>>Daily</option>
+            <option value="weekly" <?= $timeRange == 'weekly' ? 'selected' : '' ?>>Weekly</option>
+        </select>
+    </label>
+
+    <label id="sprintSelect">Sprint:
+        <select name="sprintId">
+            <option value="">-- Select Sprint --</option>
+            <?php foreach ($sprints as $s): ?>
+                <option value="<?= $s['id'] ?>" <?= $s['id'] == $sprintId ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($s['name']) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+
+    <label>Developer:
+        <select name="developer">
+            <option value="">-- All Developers --</option>
+            <?php foreach ($developers as $id => $name): ?>
+                <option value="<?= $id ?>" <?= $id == $developer ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($name) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+
+    <input type="hidden" name="storyPointField" value="<?= htmlspecialchars($storyPointField) ?>">
+
+    <button type="submit">Update</button>
+</form>
+
+<p><strong>Total Completed Story Points: <?= $totalPoints ?></strong></p>
+
+<canvas id="storyChart" width="800" height="400"></canvas>
+
+<script>
+    function toggleSprint(val) {
+        document.getElementById('sprintSelect').style.display = (val === 'sprint') ? 'inline-block' : 'none';
+    }
+
+    toggleSprint('<?= $timeRange ?>');
+
+    const ctx = document.getElementById('storyChart').getContext('2d');
+
+    const issueLabels = <?= json_encode(array_map(function($label) {
+        return mb_strlen($label) > 30 ? mb_substr($label, 0, 27) . '...' : $label;
+    }, $issueLabels)) ?>;
+
+    const chartTitle = '<?= $developer ? "Tasks for " . addslashes($developers[$developer] ?? "Developer") : "All Developers" ?> - <?= ucfirst($timeRange) ?>';
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: issueLabels,
+            datasets: [{
+                label: 'Story Points',
+                data: <?= json_encode($issuePoints) ?>,
+                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: chartTitle
+                },
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Points' }
+                },
+                x: {
+                    title: { display: true, text: 'Tasks (Summaries)' },
+                    ticks: {
+                        autoSkip: false,
+                        maxRotation: 0,
+                        minRotation: 0
+                    }
+                }
+            }
+        }
+    });
+</script>
                     </div>
                 </div>
                 </div>
@@ -351,7 +568,7 @@
     </div>
   </div>
 
-  <!-- Scroll to top -->
+ <!-- Scroll to top -->
   <a class="scroll-to-top rounded" href="#page-top">
     <i class="fas fa-angle-up"></i>
   </a>
@@ -362,91 +579,6 @@
   <script src="assets/js/ruang-admin.min.js"></script>
   <script src="assets/vendor/chart.js/Chart.min.js"></script>
   <script src="assets/js/demo/chart-area-demo.js"></script>  
+
 </body>
-<script>
-    let chart;
-
-    function handleDeveloperChange() {
-        const developer = document.getElementById('developer').value;
-        const teamSelect = document.getElementById('team');
-        if (developer) {
-            teamSelect.selectedIndex = 0;
-        }
-    }
-
-    function handleTeamChange() {
-        const team = document.getElementById('team').value;
-        const developerSelect = document.getElementById('developer');
-        if (team) {
-            developerSelect.selectedIndex = 0;
-        }
-    }
-    function filterByTab(tab) {
-      const sprint = document.getElementById('sprint');
-      if(tab != 'sprint'){
-        sprint.selectedIndex = 0;
-      }  
-      const repo = document.getElementById('repo').value;
-      const developer = document.getElementById('developer').value;
-      const team = document.getElementById('team').value;
-      let startDate = '', endDate = '';
-
-      if (tab === 'sprint') {
-        const sprintRange = document.getElementById('sprint').value;
-        const dates = sprintRange.split('@@@');
-        startDate = dates[0];
-        endDate = dates[1];
-      }
-
-      fetch(`api_pr_merge_time.php?repo=${repo}&developer=${developer}&team=${team}&tab=${tab}&startDate=${startDate}&endDate=${endDate}`)
-        .then(response => response.json())
-        .then(data => {
-          renderChart(data.labels, data.values, data.displays);
-        });
-    }
-
-    function renderChart(labels, values, displays) {
-      const ctx = document.getElementById('prChart').getContext('2d');
-      if (chart) chart.destroy();
-
-      chart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Time to Merge (Minutes)',
-            data: values,
-            backgroundColor: 'rgba(54, 162, 235, 0.5)',
-            borderColor: 'rgba(54, 162, 235, 1)',
-            borderWidth: 1
-          }]
-        },
-        options: {
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function (context) {
-                  return `Time: ${displays[context.dataIndex]}`;
-                }
-              }
-            }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Minutes'
-              }
-            }
-          }
-        }
-      });
-    }
-
-    // Load default data on page load
-    window.onload = () => {
-      filterByTab('daily');
-    };
-  </script>
 </html>
