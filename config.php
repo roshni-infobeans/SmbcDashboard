@@ -7,6 +7,6 @@ $dotenv->load();
 
 $github_token = $_ENV['GITHUB_TOKEN'];
 $repo_owner   = $_ENV['REPO_OWNER'];
-
+$repo = $_ENV['REPO'];
 ?>
 
