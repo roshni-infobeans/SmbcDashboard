@@ -6,12 +6,6 @@
         </div> -->
         <div class="sidebar-brand-text mx-3">SMBC Dashboard</div>
       </a>
-      <hr class="sidebar-divider my-0">
-      <li class="nav-item active">
-        <a class="nav-link" href="#">
-          <i class="fas fa-fw fa-tachometer-alt"></i>
-          <span>Metrics</span></a>
-      </li>
       <hr class="sidebar-divider">
       <div class="sidebar-heading">
         Features
