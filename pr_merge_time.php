@@ -59,20 +59,20 @@ $teams = get_teams_by_organization($github_token,$github_organization);
                 <!-- Tab Buttons -->
                 <div class="btn-group mb-2 mr-3" style="margin-top: 1.7em;height:calc(1.5em + .75rem + 7px);">
                     <div class="btn-group">
-                        <button type="button" class="btn btn-primary" onclick="filterByTab('daily')">Daily</button>
-                        <button type="button" class="btn btn-secondary" onclick="filterByTab('weekly')">Weekly</button>
+                        <button type="button" id="dailyTab" class="btn btn-primary" onclick="filterByTab('daily')">Daily</button>
+                        <button type="button" id="weeklyTab" class="btn btn-secondary" onclick="filterByTab('weekly')">Weekly</button>
                     </div>
                 </div>
 
                 <!-- Sprint Dropdown -->
-                <div class="form-group mb-2">
+                <!-- <div class="form-group mb-2">
                     <label for="sprint" class="mr-2">Sprint:</label>
                     <select class="form-control" id="sprint" onchange="filterByTab('sprint')">
                     <option value="">Select Sprint</option>
                     <option value="2025-05-01@@@2025-05-21">Sprint 1</option>
                     <option value="2025-05-22@@@2025-06-14">Sprint 2</option>
                     </select>
-                </div>
+                </div> -->
 
                 </div>
             </div>
@@ -146,22 +146,38 @@ $teams = get_teams_by_organization($github_token,$github_organization);
         }
     }
     function filterByTab(tab) {
-      const sprint = document.getElementById('sprint');
-      if(tab != 'sprint'){
-        sprint.selectedIndex = 0;
-      }  
+      // const sprint = document.getElementById('sprint');
+      // if(tab != 'sprint'){
+      //   sprint.selectedIndex = 0;
+      // }  
       const repo = document.getElementById('repo').value;
       const developer = document.getElementById('developer').value;
       const team = document.getElementById('team').value;
       let startDate = '', endDate = '';
 
-      if (tab === 'sprint') {
-        const sprintRange = document.getElementById('sprint').value;
-        const dates = sprintRange.split('@@@');
-        startDate = dates[0];
-        endDate = dates[1];
-      }
+      // if (tab === 'sprint') {
+      //   const sprintRange = document.getElementById('sprint').value;
+      //   const dates = sprintRange.split('@@@');
+      //   startDate = dates[0];
+      //   endDate = dates[1];
+      // }
 
+      // Highlight the active tab
+      document.getElementById('dailyTab').classList.remove('btn-primary');
+      document.getElementById('dailyTab').classList.add('btn-secondary');
+
+      document.getElementById('weeklyTab').classList.remove('btn-primary');
+      document.getElementById('weeklyTab').classList.add('btn-secondary');
+
+      // Set clicked tab to primary
+      if (tab === 'daily') {
+        document.getElementById('dailyTab').classList.remove('btn-secondary');
+        document.getElementById('dailyTab').classList.add('btn-primary');
+      } else if (tab === 'weekly') {
+        document.getElementById('weeklyTab').classList.remove('btn-secondary');
+        document.getElementById('weeklyTab').classList.add('btn-primary');
+      }
+      
       fetch(`api_pr_merge_time.php?repo=${repo}&developer=${developer}&team=${team}&tab=${tab}&startDate=${startDate}&endDate=${endDate}`)
         .then(response => response.json())
         .then(data => {
