@@ -41,6 +41,7 @@
                     $ch = curl_init($url);
                     curl_setopt_array($ch, [
                         CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_SSL_VERIFYPEER => false,
                         CURLOPT_USERAGENT => 'PHP App',
                         CURLOPT_HTTPHEADER => [
                             "Authorization: token $github_token"
@@ -74,6 +75,7 @@
                                 $ch = curl_init($userUrl);
                                 curl_setopt_array($ch, [
                                     CURLOPT_RETURNTRANSFER => true,
+                                    CURLOPT_SSL_VERIFYPEER => false,
                                     CURLOPT_USERAGENT => 'PHP App',
                                     CURLOPT_HTTPHEADER => [
                                         "Authorization: token $token"

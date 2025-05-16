@@ -10,6 +10,7 @@ function fetchFromGitHub($url, $token) {
     $ch = curl_init("https://api.github.com/$url");
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_USERAGENT => 'PHP Script',
         CURLOPT_HTTPHEADER => [
             "Authorization: token $token"
