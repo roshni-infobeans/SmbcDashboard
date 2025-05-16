@@ -26,6 +26,7 @@
           <div class="bg-white py-2 collapse-inner rounded">
             <a class="collapse-item" href="commit_volume.php">Commit Volume</a>
             <a class="collapse-item" href="pr_merge_time.php">Time to merge PR</a>
+             <a class="collapse-item" href="jira.php">Completed Story Points</a>
           </div>
         </div>
       </li>
