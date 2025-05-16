@@ -22,13 +22,15 @@
     <!-- Sidebar -->
     <div id="content-wrapper" class="d-flex flex-column">
       <div id="content">
-
         <?php include 'topbar.php'; ?>
-        
         <!-- Container Fluid-->
         <div class="container-fluid" id="container-wrapper">
         <div class="d-sm-flex align-items-center justify-content-between mb-4">
             <h1 class="h3 mb-0 text-gray-800">Story Points Dashboard</h1>
+            <!-- <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="./">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
+            </ol> -->
         </div>
 
 
@@ -140,7 +142,7 @@ $boardId = $_GET['boardId'] ?? $defaultBoardId ?? ($boards[0]['id'] ?? 1);
 
 $sprintId = $_GET['sprintId'] ?? '';
 $developer = $_GET['developer'] ?? '';
-$timeRange = $_GET['timeRange'] ?? 'sprint';
+$timeRange = 'weekly'; // force weekly as the only option
 $storyPointField = $_GET['storyPointField'] ?? 'customfield_10016';
 
 $sprints = getSprints($jiraDomain, $boardId, $headers);
@@ -170,10 +172,9 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
         <div class="col-lg-12">
             <div class="card p-3">
                 <div class="d-flex flex-wrap align-items-center mb-3">
-
                     <div class="form-group mb-2 mr-3">
-                        <label for="repo" class="mr-2">Board:</label>
-                        <select class="form-control" name="boardId" onchange="this.form.submit()">
+                        <label for="repo" class="mr-2">Project:</label>
+                        <select disabled  class="form-control" name="boardId" onchange="this.form.submit()">
                             <?php foreach ($boards as $board): ?>
                                 <option value="<?= $board['id'] ?>" <?= $board['id'] == $boardId ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($board['name']) ?>
@@ -182,15 +183,7 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
                         </select>
                     </div>
 
-                    <div class="form-group mb-2 mr-3">
-                        <label for="timeRange" class="mr-2">Time Range:</label>
-                        <select class="form-control" name="timeRange" onchange="this.form.submit()">
-                            <option value="sprint" <?= $timeRange == 'sprint' ? 'selected' : '' ?>>Sprint</option>
-                            <option value="daily" <?= $timeRange == 'daily' ? 'selected' : '' ?>>Daily</option>
-                            <option value="weekly" <?= $timeRange == 'weekly' ? 'selected' : '' ?>>Weekly</option>
-                        </select>
-                    </div>
-
+                    
                     <div class="form-group mb-2 mr-3" id="sprintSelect">
                         <label for="sprintId" class="mr-2">Sprint:</label>
                         <select class="form-control" name="sprintId" onchange="this.form.submit()">
@@ -202,7 +195,12 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
                             <?php endforeach; ?>
                         </select>
                     </div>
-
+<div hidden class="form-group mb-2 mr-3">
+    <label for="timeRange" class="mr-2">Time Range:</label>
+    <select class="form-control" name="timeRange" onchange="this.form.submit()">
+        <option value="weekly" selected>Weekly</option>
+    </select>
+</div>
                     <div class="form-group mb-2 mr-3">
                         <label for="developer">Developer:</label>
                         <select class="form-control" name="developer" onchange="this.form.submit()">
@@ -276,9 +274,6 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
         }
     });
 </script>
-
-
-
 </div>
 
             </div>
