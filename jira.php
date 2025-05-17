@@ -77,8 +77,8 @@ function getSprints($jiraDomain, $boardId, $headers) {
 function fetchIssues($jiraDomain, $boardId, $sprintId, $developer, $headers, $storyPointField, $timeRange) {
     $jql = "statusCategory = Done";
 
-    if ($timeRange === 'sprint' && $sprintId) {
-        $jql .= " AND sprint = $sprintId";
+    if (!empty($sprintId)) {
+    $jql .= " AND sprint = $sprintId";
     } else {
         // Restrict issues to selected board's sprints
         $allSprints = getSprints($jiraDomain, $boardId, $headers);
