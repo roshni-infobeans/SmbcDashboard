@@ -113,8 +113,8 @@ function fetchIssues($jiraDomain, $boardId, $sprintId, $developer, $headers, $st
 
 function calculateStoryPoints($issues, $storyPointField, &$developers) {
     $total = 0;
-    $labels = [];
-    $points = [];
+    $data = [];
+
     foreach ($issues['issues'] as $issue) {
         $summary = $issue['fields']['summary'] ?? 'Unknown';
         $value = $issue['fields'][$storyPointField] ?? 0;
@@ -124,11 +124,39 @@ function calculateStoryPoints($issues, $storyPointField, &$developers) {
             $developers[$accountId] = $assignee;
         }
         $total += $value;
-        $labels[] = $summary;
-        $points[] = $value;
+
+        // Store data as array for sorting later
+        $data[] = [
+            'summary' => $summary,
+            'points' => $value
+        ];
     }
+
+    // Sort data by sprint number extracted from summary
+    usort($data, function($a, $b) {
+        $sprintA = strtolower($a['summary']);
+        $sprintB = strtolower($b['summary']);
+
+        preg_match('/\d+/', $sprintA, $aNum);
+        preg_match('/\d+/', $sprintB, $bNum);
+
+        $aNum = isset($aNum[0]) ? intval($aNum[0]) : PHP_INT_MAX;
+        $bNum = isset($bNum[0]) ? intval($bNum[0]) : PHP_INT_MAX;
+
+        if ($aNum === $bNum) {
+            return strcmp($sprintA, $sprintB);
+        }
+        return $aNum - $bNum;
+    });
+
+    // Separate labels and points after sorting
+    $labels = array_column($data, 'summary');
+    $points = array_column($data, 'points');
+
     return [$total, $labels, $points];
 }
+
+
 
 $boards = getBoards($jiraDomain, $headers);
 $defaultBoardId = null;
