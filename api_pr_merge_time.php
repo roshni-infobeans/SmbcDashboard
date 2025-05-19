@@ -109,6 +109,7 @@ foreach ($all_prs as $pr) {
         $display = round($diff_seconds / 86400, 2) . ' day(s)';
     }
     $merge_at = date('Y-m-d',strtotime($pr['merged_at']));
+    $created_at = date('Y-m-d',strtotime($pr['created_at']));
     $filtered_data[] = [
         // 'title' => $pr['title'],
         'title' => $merge_at,
@@ -116,7 +117,7 @@ foreach ($all_prs as $pr) {
         'display' => $display.", Title:".$pr['title']
     ];
     $export_data[] = [
-        $pr['id'],$pr['title'],$pr['user']['login'],$pr['created_at'],$merge_at,$display
+        $pr['id'],$pr['title'],$pr['user']['login'],$created_at,$merge_at,$display
     ];
 }
 
