@@ -1,8 +1,7 @@
 RewriteEngine On
-RewriteBase /
 
 # Redirect direct access to index.php
-RewriteRule ^index\.php$ commit_volume.php [R=301,L]
+RewriteRule ^index\.php$ /commit_volume.php [R=301,L]
 
 # Redirect root (home page) to commit_volume.php
-RewriteRule ^$ commit_volume.php [R=301,L]
+RewriteRule ^$ /commit_volume.php [R=301,L]
