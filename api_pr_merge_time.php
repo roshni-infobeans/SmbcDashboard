@@ -1,7 +1,10 @@
 <?php
-header('Content-Type: application/json');
+ob_start();
 require_once 'config.php';
 require_once 'helopers.php';
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Font;
 
 // === INPUT PARAMETERS ===
 $repo_name = $_GET['repo'] ?? '';
@@ -10,6 +13,7 @@ $team_slug = $_GET['team'] ?? '';
 $tab = $_GET['tab'] ?? 'daily';
 $startDate = $_GET['startDate'] ?? '';
 $endDate = $_GET['endDate'] ?? '';
+$export = $_GET['export'] ?? false;
 $all_prs = [];
 $page = 1;
 $per_page = 100;
@@ -53,18 +57,18 @@ switch ($tab) {
         $start = (clone $now)->modify('monday this week')->setTime(0, 0);
         $end = (clone $now)->modify('sunday this week')->setTime(23, 59);
         break;
-    case 'sprint':
+    case 'range':
         if ($startDate && $endDate) {
             $start = new DateTime($startDate);
             $end = new DateTime($endDate);
             $end->setTime(23, 59);
         } else {
-            $start = new DateTime('1970-01-01');
+            $start = (new DateTime())->modify('-3 months');
             $end = new DateTime();
         }
         break;
     default:
-        $start = new DateTime('1970-01-01');
+        $start = (new DateTime())->modify('-3 months');
         $end = new DateTime();
 }
 
@@ -104,17 +108,61 @@ foreach ($all_prs as $pr) {
     } else {
         $display = round($diff_seconds / 86400, 2) . ' day(s)';
     }
-
+    $merge_at = date('Y-m-d',strtotime($pr['merged_at']));
     $filtered_data[] = [
-        'title' => $pr['title'],
+        // 'title' => $pr['title'],
+        'title' => $merge_at,
         'value' => $value_in_minutes,
-        'display' => $display
+        'display' => $display.", Title:".$pr['title']
+    ];
+    $export_data[] = [
+        $pr['id'],$pr['title'],$pr['user']['login'],$pr['created_at'],$merge_at,$display
     ];
 }
 
-// === PREPARE RESPONSE ===
-echo json_encode([
-    'labels' => array_column($filtered_data, 'title'),
-    'values' => array_column($filtered_data, 'value'),
-    'displays' => array_column($filtered_data, 'display')
-]);
+if($export == 'true' || $export == true){
+    if (empty($export_data)) {
+        http_response_code(204); // No Content
+        exit;
+    }
+    $titleArr = ['PR ID', 'Title', 'Merged By','Create Date', 'Merge Date','Time to Merge'];
+    array_unshift($export_data,$titleArr);
+    
+    // Create spreadsheet
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+
+    // Add data to sheet starting from A1
+    foreach ($export_data as $rowIndex => $row) {
+        foreach ($row as $colIndex => $cellValue) {
+            $cell = $sheet->getCellByColumnAndRow($colIndex + 1, $rowIndex + 1);
+            $cell->setValue($cellValue);
+
+            // Make header bold
+            if ($rowIndex === 0) {
+                $cell->getStyle()->getFont()->setBold(true);
+            }
+        }
+    }
+
+    // Unique filename with microseconds
+    $filename = 'merged_pr_data_' . date('Ymd_His') . '_' . substr((string)microtime(true), -3) . '.xlsx';
+    // ob_clean();
+    // flush();
+    // Set headers for download
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header("Content-Disposition: attachment;filename=\"$filename\"");
+    header('Cache-Control: max-age=0');
+
+    // Write file to output
+    $writer = new Xlsx($spreadsheet);
+    $writer->save('php://output');
+    exit;
+}else{
+    echo json_encode([
+        'labels' => array_column($filtered_data, 'title'),
+        'values' => array_column($filtered_data, 'value'),
+        'displays' => array_column($filtered_data, 'display')
+    ]);
+}
+?>

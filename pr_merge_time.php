@@ -30,21 +30,21 @@ $teams = get_teams_by_organization($github_token,$github_organization);
                 <!-- Repo Dropdown -->
                 <div class="form-group mb-2 mr-3">
                     <label for="repo" class="mr-2">Repo:</label>
-                    <select class="form-control" id="repo" onchange="handleRepoChange()">
+                    <select class="form-control form-control-sm" id="repo" onchange="handleRepoChange()">
                     </select>
                 </div>
 
                 <!-- Developer Dropdown -->
                 <div class="form-group mb-2 mr-3">
                     <label for="developer" class="mr-2">Developer:</label>
-                    <select class="form-control" id="developer" onchange="handleDeveloperChange()">
+                    <select class="form-control form-control-sm" id="developer" onchange="handleDeveloperChange()">
                     </select>
                 </div>
 
                 <!-- Team Dropdown -->
                 <div class="form-group mb-2 mr-3">
                     <label for="team" class="mr-2">Team:</label>
-                    <select class="form-control" id="team" onchange="handleTeamChange()">
+                    <select class="form-control form-control-sm" id="team" onchange="handleTeamChange()">
                     <option value="">All Teams</option>
                       <?php
                         foreach($teams as $team){
@@ -57,24 +57,28 @@ $teams = get_teams_by_organization($github_token,$github_organization);
                 </div>
 
                 <!-- Tab Buttons -->
-                <div class="btn-group mb-2 mr-3" style="margin-top: 1.7em;height:calc(1.5em + .75rem + 7px);">
+                <div class="btn-group mb-2 mr-3">
                     <div class="btn-group">
-                        <button type="button" id="dailyTab" class="btn btn-primary" onclick="filterByTab('daily')">Daily</button>
-                        <button type="button" id="weeklyTab" class="btn btn-secondary" onclick="filterByTab('weekly')">Weekly</button>
-                    </div>
+                        <button type="button" style="margin-top: 1.9em;" id="dailyTab" class="btn btn-primary btn-sm" onclick="filterByTab('daily')">Daily</button>
+                        <button type="button" style="margin-top: 1.9em;" id="weeklyTab" class="btn btn-secondary btn-sm" onclick="filterByTab('weekly')">Weekly</button>
+                        <input type="hidden" value="" id="tab" name="tab">
+                      </div>
                 </div>
 
-                <!-- Sprint Dropdown -->
-                <!-- <div class="form-group mb-2">
-                    <label for="sprint" class="mr-2">Sprint:</label>
-                    <select class="form-control" id="sprint" onchange="filterByTab('sprint')">
-                    <option value="">Select Sprint</option>
-                    <option value="2025-05-01@@@2025-05-21">Sprint 1</option>
-                    <option value="2025-05-22@@@2025-06-14">Sprint 2</option>
-                    </select>
-                </div> -->
-
-                </div>
+                  <div class="form-group mb-2 mr-3" id="simple-date4">
+                      <label for="sprint" class="mr-2">Range Select:</label>
+                      <div class="input-daterange input-group">
+                        <input type="text" placeholder="From" style="width: 100px !important;" id="startDate" class="input-sm form-control form-control-sm mr-3" name="start" />
+                        <input type="text" placeholder="To" style="width: 100px !important;" id="endDate" class="input-sm form-control form-control-sm" name="end" />
+                      </div>
+                  </div>
+                  <div class="form-group mb-2" >
+                      <button type="button" id="rangeGo" style="margin-top: 1.9em;" class="btn btn-primary btn-sm mr-3">Go</button>
+                  </div>   
+                  <div class="form-group mb-2" >
+                      <button type="button" id="exportBtn" style="margin-top: 1.9em;" class="btn btn-primary btn-sm">Export</button>
+                  </div>      
+              </div>
             </div>
             </div>
         </div>
@@ -84,7 +88,7 @@ $teams = get_teams_by_organization($github_token,$github_organization);
                 <div class="card p-4">
                     <h5 class="card-title">Chart</h5>
                     <div>
-                    <canvas id="prChart" width="100%" height="40"></canvas>
+                    <canvas id="prChart" width="100%" height="20"></canvas>
                     </div>
                 </div>
                 </div>
@@ -119,9 +123,14 @@ $teams = get_teams_by_organization($github_token,$github_organization);
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- <script src="assets/vendor/chart.js/Chart.min.js"></script> -->
   <!-- <script src="assets/js/demo/chart-area-demo.js"></script>   -->
+   <!-- Bootstrap Datepicker -->
+  <script src="assets/vendor/bootstrap-datepicker/js/bootstrap-datepicker.min.js"></script>
 </body>
 <script>
     let chart;
+    const rangegobtn = document.getElementById('rangeGo');
+    const start_date = document.getElementById('startDate');
+    const end_date = document.getElementById('endDate');
     const repoOwner = '<?php echo $repo_owner;?>';
     const organization = '<?php echo $github_organization;?>';
 
@@ -146,21 +155,21 @@ $teams = get_teams_by_organization($github_token,$github_organization);
         }
     }
     function filterByTab(tab) {
-      // const sprint = document.getElementById('sprint');
-      // if(tab != 'sprint'){
-      //   sprint.selectedIndex = 0;
-      // }  
+      
+      if(tab != 'range'){
+        start_date.value = '';
+        end_date.value = '';
+      }  
+      document.getElementById('tab').value = tab;
       const repo = document.getElementById('repo').value;
       const developer = document.getElementById('developer').value;
       const team = document.getElementById('team').value;
       let startDate = '', endDate = '';
 
-      // if (tab === 'sprint') {
-      //   const sprintRange = document.getElementById('sprint').value;
-      //   const dates = sprintRange.split('@@@');
-      //   startDate = dates[0];
-      //   endDate = dates[1];
-      // }
+      if (tab === 'range') {
+        startDate = start_date.value;
+        endDate = end_date.value;
+      }
 
       // Highlight the active tab
       document.getElementById('dailyTab').classList.remove('btn-primary');
@@ -231,7 +240,7 @@ $teams = get_teams_by_organization($github_token,$github_organization);
 
     // Load default data on page load
     window.onload = () => {
-      
+      rangegobtn.disabled = true;
       const apiUrl = 'https://api.github.com/users/'+repoOwner+'/repos'; 
 
       // Call the API to get the repo data
@@ -245,6 +254,7 @@ $teams = get_teams_by_organization($github_token,$github_organization);
           .then(data => {
               // Assuming data is an array
               populateRepoDropdown(data);
+              rangegobtn.disabled = false;
               filterByTab('daily'); 
               if (data.length > 0) {
                 fetchDevelopers(repoOwner, data[0].name); // Fetch developers for first repo
@@ -296,5 +306,89 @@ $teams = get_teams_by_organization($github_token,$github_organization);
         dropdown.appendChild(option);
       });
     }
+
+    $(document).ready(function () {
+      // Bootstrap Date Picker
+      $('#simple-date4 .input-daterange').datepicker({        
+        format: 'yyyy/mm/dd',        
+        autoclose: true,     
+        todayHighlight: true,   
+        todayBtn: 'linked',
+      });
+
+      $('#startDate, #endDate').on('changeDate change', function () {
+        $('#tab').val('range');
+      });
+
+      //Filter by range
+      $(document).on('click','#rangeGo',function(){
+        const repo = document.getElementById('repo').value;
+        if(repo === undefined){
+          alert('Repo required');
+          return false;
+        }
+        if(start_date.value == '' && end_date.value == ''){
+          alert('Select date range');
+          return false;
+        }else if(start_date.value === undefined){
+          alert('Select start date');
+          return false;
+        }else if(end_date.value === undefined){
+          alert('Select end date');
+          return false;
+        }
+        filterByTab('range');
+      });
+
+      //Export xls,csv
+      $('#exportBtn').on('click', function() {
+        let tab = document.getElementById('tab').value;
+        let repo = document.getElementById('repo').value;
+        if(repo == '' || repo == undefined){
+          alert('Repo required');
+          return false; 
+        }
+        $.ajax({
+            url: 'api_pr_merge_time.php',
+            type: 'GET',
+            data: {
+              repo: repo,
+              developer: document.getElementById('developer').value,
+              team: document.getElementById('team').value,
+              tab: tab,
+              startDate:start_date.value,
+              endDate: end_date.value,
+              export: true,
+            },
+            xhrFields: {
+                responseType: 'blob'  // Expect binary response (CSV/Excel)
+            },
+            success: function(blob, status, xhr) {
+                if (xhr.status === 204) {
+                  alert("No data found for the selected criteria.");
+                  return;
+                }
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = "";
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+                // var link = document.createElement('a');
+                // link.href = window.URL.createObjectURL(blob);
+                // link.download = "";  // Or .xlsx
+                // link.click();
+            },
+            error: function(xhr, status, error) {
+                console.error('Export failed:', error);
+            }
+        });
+      });
+
+
+    });
+
   </script>
 </html>
