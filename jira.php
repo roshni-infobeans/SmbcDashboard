@@ -253,7 +253,7 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
             </div>
 
             <div  class="form-group ml-3 mt-4">
-                <a style="margin-top: 5px;" href="export_excel.php?sprintId=<?= urlencode($sprintId) ?>&boardId=<?= urlencode($boardId) ?>&developer=<?= urlencode($developer) ?>&storyPointField=<?= urlencode($storyPointField) ?>&startDate=<?= urlencode($startDate) ?>&endDate=<?= urlencode($endDate) ?>"
+                <a style="margin-top: 5px;background-color: #004831;color: white;" href="export_excel.php?sprintId=<?= urlencode($sprintId) ?>&boardId=<?= urlencode($boardId) ?>&developer=<?= urlencode($developer) ?>&storyPointField=<?= urlencode($storyPointField) ?>&startDate=<?= urlencode($startDate) ?>&endDate=<?= urlencode($endDate) ?>"
                    class="btn btn-outline-primary" target="_blank">Export to Excel</a>
             </div>
         </div>
