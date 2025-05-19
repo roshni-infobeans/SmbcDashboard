@@ -9,7 +9,7 @@
                 <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-toggle="dropdown"
                     aria-haspopup="true" aria-expanded="false">
                     <img class="img-profile rounded-circle" src="assets/img/logo/infobeans_logo.jpeg" style="max-width: 60px">
-                    <span class="ml-2 d-none d-lg-inline text-white small">User Profile</span>
+                    <span class="ml-2 d-none d-lg-inline text-white small">InfoBeans Profile</span>
                 </a>
                 </li>
             </ul>
