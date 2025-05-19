@@ -16,8 +16,8 @@
   <style type="text/css">
       .btn-outline-primary:not(:disabled):not(.disabled).active, .btn-outline-primary:not(:disabled):not(.disabled):active, .show > .btn-outline-primary.dropdown-toggle {
   color: #fff;
-  background-color: #004831;
-  border-color: #004831;
+  background-color: #a0c81e;
+  border-color: #a0c81e;
 }
 .btn-outline-primary {
     color:#616161;
@@ -202,16 +202,20 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
             </div>
 
             <div class="form-group mr-3">
-                <label>Sprint:</label>
-                <select class="form-control" name="sprintId" onchange="this.form.submit()">
-                    <option value="">-- All Sprints --</option>
-                    <?php foreach ($sprints as $s): ?>
-                        <option value="<?= $s['id'] ?>" <?= $s['id'] == $sprintId ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($s['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
+    <label>Sprint:</label>
+    <select class="form-control" name="sprintId" onchange="this.form.submit()">
+        <option value="">-- All Sprints --</option>
+        <?php foreach ($sprints as $s): ?>
+            <?php
+                // Remove the first word (project prefix) from sprint name
+                $sprintName = preg_replace('/^\w+\s+/', '', $s['name']);
+            ?>
+            <option value="<?= $s['id'] ?>" <?= $s['id'] == $sprintId ? 'selected' : '' ?>>
+                <?= htmlspecialchars($sprintName) ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+</div>
 
             <div class="form-group mr-3">
                 <label>Developer:</label>
