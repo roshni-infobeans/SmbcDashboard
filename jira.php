@@ -13,6 +13,23 @@
   <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css">
   <link href="assets/css/ruang-admin.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style type="text/css">
+      .btn-outline-primary:not(:disabled):not(.disabled).active, .btn-outline-primary:not(:disabled):not(.disabled):active, .show > .btn-outline-primary.dropdown-toggle {
+  color: #fff;
+  background-color: #a0c81e;
+  border-color: #a0c81e;
+}
+.btn-outline-primary {
+    color:#616161;
+    border-color: #616161;
+    
+}
+.btn-outline-primary:hover {
+    color: #fff;
+    background-color: #616161;
+    border-color: #616161;
+}
+  </style>
 </head>
 
 <body id="page-top">
@@ -35,9 +52,6 @@
 
 
 <?php
-// error_reporting(E_ALL);
-// ini_set('display_errors', 1);
-
 $config = require 'config.php';
 
 $jiraDomain = $config['jiraDomain'];
@@ -52,56 +66,17 @@ $headers = [
 
 function getBoards($jiraDomain, $headers) {
     $url = "$jiraDomain/rest/agile/1.0/board?maxResults=1000";
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    $result = curl_exec($ch);
-    curl_close($ch);
-    $data = json_decode($result, true);
-    return $data['values'] ?? [];
+    $result = curlRequest($url, $headers);
+    return $result['values'] ?? [];
 }
 
 function getSprints($jiraDomain, $boardId, $headers) {
     $url = "$jiraDomain/rest/agile/1.0/board/$boardId/sprint?state=active,future,closed";
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    $result = curl_exec($ch);
-    curl_close($ch);
-    $data = json_decode($result, true);
-    return $data['values'] ?? [];
+    $result = curlRequest($url, $headers);
+    return $result['values'] ?? [];
 }
 
-function fetchIssues($jiraDomain, $boardId, $sprintId, $developer, $headers, $storyPointField, $timeRange) {
-    $jql = "statusCategory = Done";
-
-    if (!empty($sprintId)) {
-    $jql .= " AND sprint = $sprintId";
-    } else {
-        // Restrict issues to selected board's sprints
-        $allSprints = getSprints($jiraDomain, $boardId, $headers);
-        $sprintIds = array_map(fn($s) => $s['id'], $allSprints);
-        if (!empty($sprintIds)) {
-            $sprintIdsStr = implode(',', $sprintIds);
-            $jql .= " AND sprint IN ($sprintIdsStr)";
-        }
-
-        if ($timeRange === 'daily') {
-            $today = date('Y-m-d');
-            $jql .= " AND resolved >= $today";
-        } elseif ($timeRange === 'weekly') {
-            $sevenDaysAgo = date('Y-m-d', strtotime('-7 days'));
-            $jql .= " AND resolved >= $sevenDaysAgo";
-        }
-    }
-
-    if (!empty($developer)) {
-        $jql .= " AND assignee = \"$developer\"";
-    }
-
-    $url = "$jiraDomain/rest/api/3/search?jql=" . urlencode($jql) . "&fields=summary,status,assignee,$storyPointField,resolutiondate&maxResults=100";
+function curlRequest($url, $headers) {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -111,53 +86,70 @@ function fetchIssues($jiraDomain, $boardId, $sprintId, $developer, $headers, $st
     return json_decode($result, true);
 }
 
+function fetchIssues($jiraDomain, $boardId, $sprintId, $developer, $headers, $storyPointField, $timeRange, $startDate = '', $endDate = '') {
+ 
+    $jql = "statusCategory = Done";
+
+    if (!empty($sprintId)) {
+        $jql .= " AND sprint = $sprintId";
+    } else {
+        $allSprints = getSprints($jiraDomain, $boardId, $headers);
+        $sprintIds = array_map(fn($s) => $s['id'], $allSprints);
+        if (!empty($sprintIds)) {
+            $jql .= " AND sprint IN (" . implode(',', $sprintIds) . ")";
+        }
+
+        if ($timeRange === 'daily') {
+            $today = date('Y-m-d');
+            $jql .= " AND resolved >= \"$today\"";
+        } elseif ($timeRange === 'weekly') {
+            $sevenDaysAgo = date('Y-m-d', strtotime('-7 days'));
+            $jql .= " AND resolved >= \"$sevenDaysAgo\"";
+        }
+    }
+
+   if (!empty($startDate)) {
+    $jql .= " AND resolved >= \"$startDate\"";
+}
+if (!empty($endDate)) {
+    $jql .= " AND resolved <= \"$endDate\"";
+}
+
+
+    if (!empty($developer)) {
+        $jql .= " AND assignee = \"$developer\"";
+    }
+
+    $url = "$jiraDomain/rest/api/3/search?jql=" . urlencode($jql) . "&fields=summary,status,assignee,$storyPointField,resolutiondate&maxResults=100";
+    return curlRequest($url, $headers);
+}
+
 function calculateStoryPoints($issues, $storyPointField, &$developers) {
     $total = 0;
     $data = [];
 
     foreach ($issues['issues'] as $issue) {
         $summary = $issue['fields']['summary'] ?? 'Unknown';
-        $value = $issue['fields'][$storyPointField] ?? 0;
+        $points = $issue['fields'][$storyPointField] ?? 0;
         $assignee = $issue['fields']['assignee']['displayName'] ?? '';
         $accountId = $issue['fields']['assignee']['accountId'] ?? '';
-        if ($accountId) {
-            $developers[$accountId] = $assignee;
-        }
-        $total += $value;
 
-        // Store data as array for sorting later
-        $data[] = [
-            'summary' => $summary,
-            'points' => $value
-        ];
+        if ($accountId) $developers[$accountId] = $assignee;
+        $total += $points;
+
+        $data[] = ['summary' => $summary, 'points' => $points];
     }
 
-    // Sort data by sprint number extracted from summary
-    usort($data, function($a, $b) {
-        $sprintA = strtolower($a['summary']);
-        $sprintB = strtolower($b['summary']);
-
-        preg_match('/\d+/', $sprintA, $aNum);
-        preg_match('/\d+/', $sprintB, $bNum);
-
-        $aNum = isset($aNum[0]) ? intval($aNum[0]) : PHP_INT_MAX;
-        $bNum = isset($bNum[0]) ? intval($bNum[0]) : PHP_INT_MAX;
-
-        if ($aNum === $bNum) {
-            return strcmp($sprintA, $sprintB);
-        }
-        return $aNum - $bNum;
+    usort($data, function ($a, $b) {
+        preg_match('/\d+/', strtolower($a['summary']), $aNum);
+        preg_match('/\d+/', strtolower($b['summary']), $bNum);
+        return ($aNum[0] ?? PHP_INT_MAX) <=> ($bNum[0] ?? PHP_INT_MAX);
     });
 
-    // Separate labels and points after sorting
-    $labels = array_column($data, 'summary');
-    $points = array_column($data, 'points');
-
-    return [$total, $labels, $points];
+    return [$total, array_column($data, 'summary'), array_column($data, 'points')];
 }
 
-
-
+// Initial setup
 $boards = getBoards($jiraDomain, $headers);
 $defaultBoardId = null;
 foreach ($boards as $board) {
@@ -166,101 +158,116 @@ foreach ($boards as $board) {
         break;
     }
 }
-$boardId = $_GET['boardId'] ?? $defaultBoardId ?? ($boards[0]['id'] ?? 1);
 
+$boardId = $_GET['boardId'] ?? $defaultBoardId ?? ($boards[0]['id'] ?? 1);
 $sprintId = $_GET['sprintId'] ?? '';
 $developer = $_GET['developer'] ?? '';
-$timeRange = 'weekly'; // force weekly as the only option
+$timeRange = $_GET['timeRange'] ?? 'weekly';
 $storyPointField = $_GET['storyPointField'] ?? 'customfield_10016';
+$startDate = $_GET['startDate'] ?? '2025-05-01';
+$endDate = $_GET['endDate'] ?? '2025-05-31';
+
+
 
 $sprints = getSprints($jiraDomain, $boardId, $headers);
-
 $sprintName = 'N/A';
-if ($sprintId) {
-    foreach ($sprints as $sprint) {
-        if ($sprint['id'] == $sprintId) {
-            $sprintName = $sprint['name'];
-            break;
-        }
+foreach ($sprints as $s) {
+    if ($s['id'] == $sprintId) {
+        $sprintName = $s['name'];
+        break;
     }
 }
 
-// Step 1: Get all issues from the selected board (for listing developers)
-$allIssues = fetchIssues($jiraDomain, $boardId, $sprintId, '', $headers, $storyPointField, $timeRange);
+$allIssues = fetchIssues($jiraDomain, $boardId, $sprintId, '', $headers, $storyPointField, $timeRange, $startDate, $endDate);
 $developers = [];
 calculateStoryPoints($allIssues, $storyPointField, $developers);
 
-// Step 2: Filter issues by developer
-$issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer, $headers, $storyPointField, $timeRange) : $allIssues;
+$issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer, $headers, $storyPointField, $timeRange, $startDate, $endDate) : $allIssues;
 [$totalPoints, $issueLabels, $issuePoints] = calculateStoryPoints($issues, $storyPointField, $developers);
 ?>
 
+<!-- HTML Form -->
 <form method="get" style="margin-bottom: 20px;">
-    <div class="row mb-3">
-        <div class="col-lg-12">
-            <div class="card p-3">
-                <div class="d-flex flex-wrap align-items-center mb-3">
-                    <div class="form-group mb-2 mr-3">
-                        <label for="repo" class="mr-2">Project:</label>
-                        <select disabled  class="form-control" name="boardId" onchange="this.form.submit()">
-                            <?php foreach ($boards as $board): ?>
-                                <option value="<?= $board['id'] ?>" <?= $board['id'] == $boardId ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($board['name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+    <div class="card p-3 mb-3">
+        <div class="form-row">
+            <div class="form-group mr-3">
+                <label>Project:</label>
+                <select disabled class="form-control" name="boardId">
+                    <?php foreach ($boards as $board): ?>
+                        <option value="<?= $board['id'] ?>" <?= $board['id'] == $boardId ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($board['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
 
-                    
-                    <div class="form-group mb-2 mr-3" id="sprintSelect">
-                        <label for="sprintId" class="mr-2">Sprint:</label>
-                        <select class="form-control" name="sprintId" onchange="this.form.submit()">
-                            <option value="">-- Select Sprint --</option>
-                            <?php foreach ($sprints as $s): ?>
-                                <option value="<?= $s['id'] ?>" <?= $s['id'] == $sprintId ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($s['name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-<div hidden class="form-group mb-2 mr-3">
-    <label for="timeRange" class="mr-2">Time Range:</label>
-    <select class="form-control" name="timeRange" onchange="this.form.submit()">
-        <option value="weekly" selected>Weekly</option>
-    </select>
-</div>
-                    <div class="form-group mb-2 mr-3">
-                        <label for="developer">Developer:</label>
-                        <select class="form-control" name="developer" onchange="this.form.submit()">
-                            <option value="">-- All Developers --</option>
-                            <?php foreach ($developers as $id => $name): ?>
-                                <option value="<?= $id ?>" <?= $id == $developer ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($name) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+            <div class="form-group mr-3">
+                <label>Sprint:</label>
+                <select class="form-control" name="sprintId" onchange="this.form.submit()">
+                    <option value="">-- All Sprints --</option>
+                    <?php foreach ($sprints as $s): ?>
+                        <option value="<?= $s['id'] ?>" <?= $s['id'] == $sprintId ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($s['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
 
-                    <input type="hidden" name="storyPointField" value="<?= htmlspecialchars($storyPointField) ?>">
+            <div class="form-group mr-3">
+                <label>Developer:</label>
+                <select class="form-control" name="developer" onchange="this.form.submit()">
+                    <option value="">-- All Developers --</option>
+                    <?php foreach ($developers as $id => $name): ?>
+                        <option value="<?= $id ?>" <?= $id == $developer ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($name) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
 
+            <div class="form-group mr-3">
+                <label>Start Date:</label>
+                <input type="date" class="form-control" name="startDate" value="<?= htmlspecialchars($startDate) ?>" onchange="this.form.submit()">
+            </div>
+
+            <div class="form-group mr-3">
+                <label>End Date:</label>
+                <input type="date" class="form-control" name="endDate" value="<?= htmlspecialchars($endDate) ?>" onchange="this.form.submit()">
+            </div>
+
+            <input type="hidden" name="storyPointField" value="<?= htmlspecialchars($storyPointField) ?>">
+
+            <div class="form-group ml-3">
+                <label>Time Range:</label><br>
+                <input type="hidden" name="timeRange" id="timeRangeInput" value="<?= htmlspecialchars($timeRange) ?>">
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-sm btn-outline-primary <?= $timeRange === 'daily' ? 'active' : '' ?>"
+                            onclick="document.getElementById('timeRangeInput').value='daily'">Daily</button>
+                    <button type="submit" class="btn btn-sm btn-outline-primary <?= $timeRange === 'weekly' ? 'active' : '' ?>"
+                            onclick="document.getElementById('timeRangeInput').value='weekly'">Weekly</button>
                 </div>
+            </div>
+
+            <div class="form-group ml-3 mt-4">
+                <a href="export_excel.php?sprintId=<?= urlencode($sprintId) ?>&boardId=<?= urlencode($boardId) ?>&developer=<?= urlencode($developer) ?>&storyPointField=<?= urlencode($storyPointField) ?>&startDate=<?= urlencode($startDate) ?>&endDate=<?= urlencode($endDate) ?>"
+                   class="btn btn-outline-primary" target="_blank">Export to Excel</a>
             </div>
         </div>
     </div>
 </form>
 
-<p><strong>Total Completed Story Points: <?= $totalPoints ?></strong></p>
-<div class="row">
-                    <div class="col-lg-12">
-                    <div class="card p-4">
-                        <h5 class="card-title">Chart</h5>
-<canvas id="storyChart" width="800" height="400"></canvas>
-</div></div></div>
-<script>
-    const issueLabels = <?= json_encode(array_map(function($label) {
-        return mb_strlen($label) > 30 ? mb_substr($label, 0, 27) . '...' : $label;
-    }, $issueLabels)) ?>;
 
+<p><strong>Total Completed Story Points: <?= $totalPoints ?></strong></p>
+
+<!-- Chart -->
+<div class="card p-4">
+    <h5 class="card-title">Chart</h5>
+    <canvas id="storyChart" width="800" height="400"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const issueLabels = <?= json_encode(array_map(fn($label) => mb_strlen($label) > 30 ? mb_substr($label, 0, 27) . '...' : $label, $issueLabels)) ?>;
     const chartTitle = '<?= $developer ? "Tasks for " . addslashes($developers[$developer] ?? "Developer") : "All Developers" ?> - <?= ucfirst($timeRange) ?>';
 
     const ctx = document.getElementById('storyChart').getContext('2d');
@@ -302,6 +309,8 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
         }
     });
 </script>
+
+
 </div>
 
             </div>
