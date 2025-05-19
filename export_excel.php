@@ -72,8 +72,10 @@ if (!$issues || empty($issues['issues'])) {
     die('No data found to export');
 }
 
-header('Content-Type: text/csv');
-header('Content-Disposition: attachment; filename="story_points_export.csv"');
+// Output headers for XLSX
+header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+header('Content-Disposition: attachment; filename="story_points_export.xlsx"');
+header('Cache-Control: max-age=0');
 
 $output = fopen('php://output', 'w');
 
