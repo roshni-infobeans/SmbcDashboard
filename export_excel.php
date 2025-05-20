@@ -72,9 +72,10 @@ if (!$issues || empty($issues['issues'])) {
     die('No data found to export');
 }
 
+$filename = 'Export_Story_Point-'.date('Y-m-d').'.xlsx';
 // Output headers for XLSX
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-header('Content-Disposition: attachment; filename="story_points_export.xlsx"');
+header("Content-Disposition: attachment; filename=$filename");
 header('Cache-Control: max-age=0');
 
 $output = fopen('php://output', 'w');
@@ -119,4 +120,4 @@ foreach ($issues['issues'] as $issue) {
 }
 
 fclose($output);
-exit;
+exit;   

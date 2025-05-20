@@ -1,4 +1,5 @@
 <?php
+ini_set("display_error", true);
 ob_start();
 require_once 'config.php';
 require_once 'helopers.php';
@@ -50,11 +51,11 @@ $filtered_data = [];
 $now = new DateTime();
 switch ($tab) {
     case 'daily':
-        $start = (clone $now)->setTime(0, 0);
+        $start = (new DateTime('first day of this month'))->setTime(0, 0);
         $end = (clone $now)->setTime(23, 59);
         break;
     case 'weekly':
-        $start = (clone $now)->modify('monday this week')->setTime(0, 0);
+        $start = (new DateTime('first day of this month'))->setTime(0, 0);
         $end = (clone $now)->modify('sunday this week')->setTime(23, 59);
         break;
     case 'range':
@@ -73,6 +74,7 @@ switch ($tab) {
 }
 
 // === FILTER PRs ===
+krsort($all_prs);
 foreach ($all_prs as $pr) {
     if (!$pr['merged_at']) continue;
 
@@ -147,12 +149,12 @@ if($export == 'true' || $export == true){
     }
 
     // Unique filename with microseconds
-    $filename = 'merged_pr_data_' . date('Ymd_His') . '_' . substr((string)microtime(true), -3) . '.xlsx';
+    $filename = 'Export_PR_Merge_' . date('His') . '_' . date('Ymd') . '.xlsx';
     // ob_clean();
     // flush();
     // Set headers for download
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    header("Content-Disposition: attachment;filename=\"$filename\"");
+    header("Content-Disposition: attachment;filename=$filename");
     header('Cache-Control: max-age=0');
 
     // Write file to output

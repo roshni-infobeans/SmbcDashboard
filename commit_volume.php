@@ -58,7 +58,7 @@
                             <div class="d-flex flex-wrap align-items-center mb-3">
 
                                 <div class="form-group mb-2 mr-3">
-                                    <label for="repo-select" class="mr-2">Repo:</label>
+                                    <label for="repo-select" class="mr-2">Repository:</label>
                                     <select class="form-control" id="repo-select">
                                         <?php foreach ($repo as $r):
                                             $repo_name = $r['name'] ?? null;
@@ -69,20 +69,18 @@
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-
+                                 <div class="form-group mb-2 mr-3">
+                                    <label for="user-select" class="mr-2">Team:</label>
+                                    <select class="form-control" id="team-select">
+                                        <option value="">Select Team</option>
+                                    </select>
+                                </div>                                    
                                 <div class="form-group mb-2 mr-3">
                                     <label for="user-select" class="mr-2">Developer:</label>
                                     <select class="form-control" id="user-select">
                                         <option value="">Select Developer</option>
                                     </select>
                                 </div>
-                                <div class="form-group mb-2 mr-3">
-                                    <label for="user-select" class="mr-2">Team:</label>
-                                    <select class="form-control" id="team-select">
-                                        <option value="">Select Team</option>
-                                    </select>
-                                </div>
-
                                 <!-- <div class="form-group mb-2 mr-3">
                                     <label for="period-select">Select Period:</label>
                                     <select class="form-control" id="period-select">
@@ -90,12 +88,6 @@
                                         <option value="weekly">Weekly</option>
                                     </select>
                                 </div> -->
-                                <div class="btn-group mb-2 mr-3" style="margin-top: 1.7em;height:calc(1.5em + .75rem + 7px);">
-                                <div class="btn-group">
-                                    <button type="button" class="btn btn-primary period-select" onclick="filterByTab('daily')">Daily</button>
-                                    <button type="button" class="btn btn-secondary period-select" onclick="filterByTab('weekly')">Weekly</button>
-                                </div>
-                            </div>
                                 <div class="form-group mb-2 mr-3">
                                     <label for="from-date">From:</label>
                                     <input type="date" class="form-control" id="from-date" />
@@ -104,6 +96,15 @@
                                 <div class="form-group mb-2 mr-3">
                                     <label for="to-date">To:</label>
                                     <input type="date" class="form-control" id="to-date" />
+                                </div>
+                                <div class="btn-group mb-2 mr-3" style="margin-top: 1.7em;height:calc(1.5em + .75rem + 7px);">
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-primary period-select" onclick="filterByTab('daily')">Daily</button>
+                                    <button type="button" class="btn btn-secondary period-select" onclick="filterByTab('weekly')">Weekly</button>
+                                </div>
+                            </div>
+                                <div class="form-group mb-2 mr-3" style="margin-top: 2rem;">
+                                    <button class="btn btn-primary" onclick="exportToExcel()">Export to Excel</button>
                                 </div>
 
                             </div>
@@ -195,7 +196,7 @@
         fetch(`api_contributors.php?repo=${encodeURIComponent(repo)}`)
             .then(res => res.json())
             .then(users => {
-                userSelect.innerHTML = '<option value="">Select Developer</option>';
+                userSelect.innerHTML = '<option value="">All Developers</option>';
                 users.forEach(user => {
                     const opt = document.createElement('option');
                     opt.value = user.login;
@@ -281,7 +282,7 @@
                         labels: labels,
                         title: {
                             display: true,
-                            text: 'Date'
+                            text: 'Date of Commit'
                         },
                         ticks: {
                             maxRotation: 45,
@@ -367,6 +368,27 @@
     });
     // Initial load
     fetchTeams();
+
+    function exportToExcel() {
+        const repo = repoSelect.value;
+        const user = userSelect.value;
+        const team = teamSelect.value;
+        const period = periodSelect;
+        const from = fromDateInput.value;
+        const to = toDateInput.value;
+
+        if (!validateDates()) {
+            alert("Invalid date range.");
+            return;
+        }
+
+        let url = `export_commit_excel.php?repo=${encodeURIComponent(repo)}&period=${period}&from=${from}&to=${to}`;
+        if (user) url += `&user=${encodeURIComponent(user)}`;
+        if (team) url += `&team=${encodeURIComponent(team)}`;
+
+        window.open(url, '_blank');
+    }
+
 </script>
 </body>
 </html>

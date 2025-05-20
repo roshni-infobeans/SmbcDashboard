@@ -244,7 +244,7 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
 
             <input type="hidden" name="storyPointField" value="<?= htmlspecialchars($storyPointField) ?>">
 
-            <div class="form-group ml-3">
+            <div class="form-group ml-3" style="display: none;">
                 <label>Time Range:</label><br>
                 <input type="hidden" name="timeRange" id="timeRangeInput" value="<?= htmlspecialchars($timeRange) ?>">
                 <div class="btn-group">
@@ -267,7 +267,7 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
 <p><strong>Total Completed Story Points: <?= $totalPoints ?></strong></p>
 
 <!-- Chart -->
-<div class="card p-4">
+<div class="card p-4" style="width:1500px; height: 500px;">
     <h5 class="card-title">Chart</h5>
     <canvas id="storyChart" width="800" height="400"></canvas>
 </div>
