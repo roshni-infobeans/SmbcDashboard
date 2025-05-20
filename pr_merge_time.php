@@ -29,22 +29,14 @@ $teams = get_teams_by_organization($github_token,$github_organization);
 
                 <!-- Repo Dropdown -->
                 <div class="form-group mb-2 mr-3">
-                    <label for="repo" class="mr-2">Repo:</label>
+                    <label for="repo" class="mr-2">Repository:</label>
                     <select class="form-control form-control-sm" id="repo" onchange="handleRepoChange()">
                     </select>
                 </div>
-
-                <!-- Developer Dropdown -->
-                <div class="form-group mb-2 mr-3">
-                    <label for="developer" class="mr-2">Developer:</label>
-                    <select class="form-control form-control-sm" id="developer" onchange="handleDeveloperChange()">
-                    </select>
-                </div>
-
                 <!-- Team Dropdown -->
                 <div class="form-group mb-2 mr-3">
                     <label for="team" class="mr-2">Team:</label>
-                    <select class="form-control form-control-sm" id="team" onchange="handleTeamChange()">
+                    <select class="form-control form-control-sm" id="team">
                     <option value="">All Teams</option>
                       <?php
                         foreach($teams as $team){
@@ -55,28 +47,36 @@ $teams = get_teams_by_organization($github_token,$github_organization);
                       ?>
                     </select>
                 </div>
-
+                <!-- Developer Dropdown -->
+                <div class="form-group mb-2 mr-3">
+                    <label for="developer" class="mr-2">Developer:</label>
+                    <select class="form-control form-control-sm" id="developer">
+                    </select>
+                </div>
                 <!-- Tab Buttons -->
-                <div class="btn-group mb-2 mr-3">
+                <div class="btn-group mb-2 mr-3" style="margin-top: 1.7em;height:calc(1.5em + .75rem + 7px); display: none;">
                     <div class="btn-group">
-                        <button type="button" style="margin-top: 1.9em;" id="dailyTab" class="btn btn-primary btn-sm" onclick="filterByTab('daily')">Daily</button>
-                        <button type="button" style="margin-top: 1.9em;" id="weeklyTab" class="btn btn-secondary btn-sm" onclick="filterByTab('weekly')">Weekly</button>
+                        <button type="button" id="dailyTab" class="btn btn-primary period-select" onclick="filterByTab('daily')">Daily</button>
+                        <button type="button" class="btn btn-primary period-select" id="weeklyTab" onclick="filterByTab('weekly')">Weekly</button>
                         <input type="hidden" value="" id="tab" name="tab">
                       </div>
                 </div>
+                <div class="form-group mb-2 mr-3">
+                                    <label for="from-date">From:</label>
+                                    <input type="date" class="form-control" id="startDate"  />
+                                </div>
 
-                  <div class="form-group mb-2 mr-3" id="simple-date4">
-                      <label for="sprint" class="mr-2">Range Select:</label>
-                      <div class="input-daterange input-group">
-                        <input type="text" placeholder="From" style="width: 100px !important;" id="startDate" class="input-sm form-control form-control-sm mr-3" name="start" />
-                        <input type="text" placeholder="To" style="width: 100px !important;" id="endDate" class="input-sm form-control form-control-sm" name="end" />
-                      </div>
-                  </div>
-                  <div class="form-group mb-2" >
-                      <button type="button" id="rangeGo" style="margin-top: 1.9em;" class="btn btn-primary btn-sm mr-3">Go</button>
+                                <div class="form-group mb-2 mr-3">
+                                    <label for="to-date">To:</label>
+                                    <input type="date" class="form-control"id="endDate" />
+                                </div>
+
+                 
+                  <div class="btn-group mb-2 mr-3" style="margin-top: 1.7em;height:calc(1.5em + .75rem + 7px);">
+                      <button type="button" id="rangeGo" class="btn btn-primary period-select">Go</button>
                   </div>   
-                  <div class="form-group mb-2" >
-                      <button type="button" id="exportBtn" style="margin-top: 1.9em;" class="btn btn-primary btn-sm">Export</button>
+                  <div class="form-group mb-2" style="margin-top: 1.7em;height:calc(1.5em + .75rem + 7px);">
+                      <button type="button" id="exportBtn" class="btn btn-primary period-select">Export to Excel</button>
                   </div>      
               </div>
             </div>
@@ -133,33 +133,36 @@ $teams = get_teams_by_organization($github_token,$github_organization);
     const end_date = document.getElementById('endDate');
     const repoOwner = '<?php echo $repo_owner;?>';
     const organization = '<?php echo $github_organization;?>';
+    const teamSelect = document.getElementById('team');
+    const userSelect = document.getElementById('developer');
+    let allDevelopers = [];
 
     function handleRepoChange() {
         const repo = document.getElementById('repo').value;
         fetchDevelopers(repoOwner, repo)
     }
 
-    function handleDeveloperChange() {
-        const developer = document.getElementById('developer').value;
-        const teamSelect = document.getElementById('team');
-        if (developer) {
-            teamSelect.selectedIndex = 0;
-        }
-    }
+    // function handleDeveloperChange() {
+    //     const developer = document.getElementById('developer').value;
+    //     const teamSelect = document.getElementById('team');
+    //     if (developer) {
+    //         teamSelect.selectedIndex = 0;
+    //     }
+    // }
 
-    function handleTeamChange() {
-        const team = document.getElementById('team').value;
-        const developerSelect = document.getElementById('developer');
-        if (team) {
-            developerSelect.selectedIndex = 0;
-        }
-    }
+    // function handleTeamChange() {
+    //     const team = document.getElementById('team').value;
+    //     const developerSelect = document.getElementById('developer');
+    //     if (team) {
+    //         developerSelect.selectedIndex = 0;
+    //     }
+    // }
     function filterByTab(tab) {
       
-      if(tab != 'range'){
+     /* if(tab != 'range'){
         start_date.value = '';
         end_date.value = '';
-      }  
+      }*/  
       document.getElementById('tab').value = tab;
       const repo = document.getElementById('repo').value;
       const developer = document.getElementById('developer').value;
@@ -307,6 +310,28 @@ $teams = get_teams_by_organization($github_token,$github_organization);
       });
     }
 
+    function fetchTeamMembers(teamSlug) {
+        if (teamSlug === 'all') {
+            updateDeveloperDropdown(allDevelopers);
+            return;
+        }
+
+        fetch(`api_team_members.php?team_slug=${encodeURIComponent(teamSlug)}`)
+            .then(res => res.json())
+            .then(members => {
+                const memberLogins = members.map(m => m.login.toLowerCase());
+                updateDeveloperDropdown(memberLogins);
+            });
+    }
+    function updateDeveloperDropdown(developers) {
+        userSelect.innerHTML = '<option value="">Select Developer</option>';
+        developers.forEach(user => {
+                    const opt = document.createElement('option');
+                    opt.value = user;
+                    opt.textContent = user;
+                    userSelect.appendChild(opt);
+                });
+    }
     $(document).ready(function () {
       // Bootstrap Date Picker
       $('#simple-date4 .input-daterange').datepicker({        
@@ -368,18 +393,23 @@ $teams = get_teams_by_organization($github_token,$github_organization);
                   alert("No data found for the selected criteria.");
                   return;
                 }
+                const disposition = xhr.getResponseHeader('Content-Disposition');
+                let filename = "download.xlsx"; // default fallback
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    const filenameRegex = /filename[^;=\n]*=(['"]?)([^'"\n]*)\1?/;
+                    const matches = filenameRegex.exec(disposition);
+                    if (matches != null && matches[2]) {
+                        filename = matches[2];
+                    }
+                }
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = "";
+                link.download = filename;
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
                 window.URL.revokeObjectURL(url);
-                // var link = document.createElement('a');
-                // link.href = window.URL.createObjectURL(blob);
-                // link.download = "";  // Or .xlsx
-                // link.click();
             },
             error: function(xhr, status, error) {
                 console.error('Export failed:', error);
@@ -390,5 +420,20 @@ $teams = get_teams_by_organization($github_token,$github_organization);
 
     });
 
+    // Set default dates: last 30 days
+    function setDefaultDates() {
+        const today = new Date();
+        const priorDate = new Date().setDate(today.getDate() -18);
+        document.getElementById('startDate').value = new Date(priorDate).toISOString().split('T')[0];
+        document.getElementById('endDate').value = today.toISOString().split('T')[0];
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        setDefaultDates();
+    });
+    teamSelect.addEventListener('change', () => {
+        const selectedTeam = teamSelect.value;
+        fetchTeamMembers(selectedTeam);
+    });
   </script>
 </html>
