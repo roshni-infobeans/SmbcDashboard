@@ -16,8 +16,8 @@
   <style type="text/css">
       .btn-outline-primary:not(:disabled):not(.disabled).active, .btn-outline-primary:not(:disabled):not(.disabled):active, .show > .btn-outline-primary.dropdown-toggle {
   color: #fff;
-  background-color: #a0c81e;
-  border-color: #a0c81e;
+  background-color: #004831;
+  border-color: #004831;
 }
 .btn-outline-primary {
     color:#616161;
@@ -29,7 +29,10 @@
     background-color: #616161;
     border-color: #616161;
 }
+#exporttoexcel
+{margin-top: 5px;background-color: #004831;color: white;}
   </style>
+
 </head>
 
 <body id="page-top">
@@ -252,8 +255,8 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
                 </div>
             </div>
 
-            <div class="form-group ml-3 mt-4">
-                <a href="export_excel.php?sprintId=<?= urlencode($sprintId) ?>&boardId=<?= urlencode($boardId) ?>&developer=<?= urlencode($developer) ?>&storyPointField=<?= urlencode($storyPointField) ?>&startDate=<?= urlencode($startDate) ?>&endDate=<?= urlencode($endDate) ?>"
+            <div  class="form-group ml-3 mt-4">
+                <a id="exporttoexcel" href="export_excel.php?sprintId=<?= urlencode($sprintId) ?>&boardId=<?= urlencode($boardId) ?>&developer=<?= urlencode($developer) ?>&storyPointField=<?= urlencode($storyPointField) ?>&startDate=<?= urlencode($startDate) ?>&endDate=<?= urlencode($endDate) ?>"
                    class="btn btn-outline-primary" target="_blank">Export to Excel</a>
             </div>
         </div>
@@ -282,8 +285,8 @@ $issues = $developer ? fetchIssues($jiraDomain, $boardId, $sprintId, $developer,
             datasets: [{
                 label: 'Story Points',
                 data: <?= json_encode($issuePoints) ?>,
-                backgroundColor: 'rgba(75, 192, 192, 0.6)',
-                borderColor: 'rgba(75, 192, 192, 1)',
+               backgroundColor: 'rgba(54, 162, 235, 0.5)',
+            borderColor: 'rgba(54, 162, 235, 1)',
                 borderWidth: 1
             }]
         },
